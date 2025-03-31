@@ -139,7 +139,7 @@ describe("User metadata endpoint", () => {
         })
         console.log("avatarresponse is " + avatarResponse.data.id)
 
-        avatarId = avatarResponse.data.id;
+        avatarId = avatarResponse.data.avatarId;
     })
 
     test("User cant update their metadata with a wrong avatar id", async () => {
@@ -213,7 +213,7 @@ describe("User avatar information", () => {
             }
          })
  
-         avatarId = avatarResponse.data.id;
+         avatarId = avatarResponse.data.avatarId;
  
     })
 
@@ -647,7 +647,8 @@ describe("Admin Endpoints", () => {
     let userId;
 
     beforeAll(async () => {
-        const username = `mahin-${Math.random()}`
+        
+        const username = 'mahin' + Math.random() + '@gmail.com';
         const password = "123456"
  
         const signupResponse = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
@@ -666,7 +667,7 @@ describe("Admin Endpoints", () => {
         adminToken = response.data.token
 
         const userSignupResponse = await axios.post(`${BACKEND_URL}/api/v1/signup`, {
-            username: username + "-user",
+            username: "user_" + username,
             password,
             type: "user"
         });
@@ -674,24 +675,30 @@ describe("Admin Endpoints", () => {
         userId = userSignupResponse.data.userId
     
         const userSigninResponse = await axios.post(`${BACKEND_URL}/api/v1/signin`, {
-            username: username  + "-user",
+            username: "user_" + username ,
             password
         })
     
         userToken = userSigninResponse.data.token
+
+        console.log("Admin Token : ",adminToken);
+        console.log("User Token : ",userToken);
+        
     });
 
     test("User is not able to hit admin Endpoints", async () => {
         const elementReponse = await axios.post(`${BACKEND_URL}/api/v1/admin/element`, {
-            "imageUrl": "https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcRCRca3wAR4zjPPTzeIY9rSwbbqB6bB2hVkoTXN4eerXOIkJTG1GpZ9ZqSGYafQPToWy_JTcmV5RHXsAsWQC3tKnMlH_CsibsSZ5oJtbakq&usqp=CAE",
-            "width": 1,
-            "height": 1,
-          "static": true
+            imageUrl: "https://encrypted-tbn0.gstatic.com/shopping?q=tbn:ANd9GcRCRca3wAR4zjPPTzeIY9rSwbbqB6bB2hVkoTXN4eerXOIkJTG1GpZ9ZqSGYafQPToWy_JTcmV5RHXsAsWQC3tKnMlH_CsibsSZ5oJtbakq&usqp=CAE",
+            width: 1,
+            height: 1,
+            static: true
         }, {
             headers: {
                 authorization: `Bearer ${userToken}`
             }
         });
+
+        console.log("Element Response : ",elementReponse.body);
 
         const mapResponse = await axios.post(`${BACKEND_URL}/api/v1/admin/map`, {
             "thumbnail": "https://thumbnail.com/a.png",
