@@ -38,11 +38,14 @@ export default function Login() {
             type: userType
           })
         });
+
+        console.log(response);
         
         if (response.ok) {
           setSuccess('Account created successfully! You can now sign in.');
           setTimeout(() => {
             setIsSignUp(false);
+            setLoading(false);
             setSuccess('');
           }, 2000);
         } else {
@@ -65,6 +68,7 @@ export default function Login() {
           const data = await response.json();
           if (data.token) {
             localStorage.setItem('token', data.token);
+            localStorage.setItem('userId', data.userId);
             setSuccess('Sign in successful! Redirecting...');
             // In a real app, you would redirect to the main app here
             // window.location.href = '/app';

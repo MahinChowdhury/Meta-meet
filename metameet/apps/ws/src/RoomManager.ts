@@ -20,25 +20,62 @@ export class RoomManager {
         if (!this.rooms.has(spaceId)) {
             return;
         }
-        this.rooms.set(spaceId, (this.rooms.get(spaceId)?.filter((u) => u.id !== user.id) ?? []));
+        const users = this.rooms.get(spaceId)?.filter((u) => u.id !== user.id) || [];
+        
+        if (users.length === 0) {
+            this.rooms.delete(spaceId);
+        } else {
+            this.rooms.set(spaceId, users);
+        }
+        
+        console.log(`User removed from room ${spaceId}. Current users: ${users.length}`);
     }
 
     public addUser(spaceId: string, user: User) {
         if (!this.rooms.has(spaceId)) {
             this.rooms.set(spaceId, [user]);
+            console.log(`Created new room ${spaceId} with 1 user`);
             return;
         }
-        this.rooms.set(spaceId, [...(this.rooms.get(spaceId) ?? []), user]);
+        
+        // Check if user already exists in the room by id
+        const existingUsers = this.rooms.get(spaceId) || [];
+        if (!existingUsers.some(u => u.id === user.id)) {
+            this.rooms.set(spaceId, [...existingUsers, user]);
+            console.log(`Added user to room ${spaceId}. Current users: ${existingUsers.length + 1}`);
+        } else {
+            console.log(`User already exists in room ${spaceId}`);
+        }
+    }
+
+    public getUserByUserId(spaceId: string, userId: string): User | undefined {
+        return this.rooms.get(spaceId)?.find(user => user.userId === userId);
+    }
+
+    public getUserById(spaceId: string, id: string): User | undefined {
+        return this.rooms.get(spaceId)?.find(user => user.id === id);
     }
 
     public broadcast(message: OutgoingMessage, user: User, roomId: string) {
         if (!this.rooms.has(roomId)) {
             return;
         }
-        this.rooms.get(roomId)?.forEach((u) => {
+        
+        const users = this.rooms.get(roomId) || [];
+        console.log(`Broadcasting to ${users.length - 1} users in room ${roomId}`);
+        
+        users.forEach((u) => {
             if (u.id !== user.id) {
                 u.send(message);
             }
         });
     }
-}   
+    
+    public getUsersInRoom(roomId: string): User[] {
+        return this.rooms.get(roomId) || [];
+    }
+    
+    public getRoomCount(roomId: string): number {
+        return this.rooms.get(roomId)?.length || 0;
+    }
+}

@@ -70,7 +70,10 @@ router.post("/signin", async (req, res) => {
             role: user.role,
         }, JWT_PASSWORD);
 
+        const userId = user.id;
+
         res.json({
+            userId,
             token
         })
     } catch(e) {
