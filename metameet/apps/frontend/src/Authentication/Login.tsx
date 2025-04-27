@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const BACKEND_URL = 'http://localhost:3000';
 
@@ -70,8 +71,9 @@ export default function Login() {
             localStorage.setItem('token', data.token);
             localStorage.setItem('userId', data.userId);
             setSuccess('Sign in successful! Redirecting...');
+
             // In a real app, you would redirect to the main app here
-            // window.location.href = '/app';
+            window.location.href = '/';
           }
         } else {
           if (response.status === 403) {

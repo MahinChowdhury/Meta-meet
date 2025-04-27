@@ -5,6 +5,8 @@ import client from "@repo/db";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import { JWT_PASSWORD } from "./config";
 
+
+
 function getRandomString(length: number) {
     const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let result = "";
@@ -21,6 +23,8 @@ export class User {
     private x: number;
     private y: number;
     private ws: WebSocket;
+    private activeConnections: Set<string> = new Set();
+    private proximityCheckInterval: NodeJS.Timeout | null = null;
 
     constructor(ws: WebSocket) {
         this.id = getRandomString(10);
@@ -29,6 +33,7 @@ export class User {
         this.y = 0;
         this.ws = ws;
         this.initHandlers();
+        this.startProximityCheck();
     }
 
     initHandlers() {
@@ -152,6 +157,31 @@ export class User {
                             });
                         }
                         break;
+                    case "webrtc-signal":
+                        if (!this.spaceId) {
+                            console.log("Signal rejected: User not in a space");
+                            return;
+                        }
+                        
+                        const targetId = parsedData.payload.targetId;
+                        const signal = parsedData.payload.signal;
+                        
+                        const targetUser = RoomManager.getInstance().getUserById(this.spaceId, targetId);
+                        if (!targetUser) {
+                            console.log("Target user not found");
+                            return;
+                        }
+                        
+                        // Forward the WebRTC signaling data
+                        targetUser.send({
+                            type: "webrtc-signal",
+                            payload: {
+                                targetId: this.id,
+                                targetUserId: this.userId,
+                                signal: signal
+                            }
+                        });
+                        break;
                 }
             } catch (err) {
                 console.error("Error processing message:", err);
@@ -169,19 +199,6 @@ export class User {
         });
     }
 
-    destroy() {
-        if (this.spaceId) {
-            RoomManager.getInstance().broadcast({
-                type: "user-left",
-                payload: {
-                    userId: this.userId
-                }
-            }, this, this.spaceId);
-            
-            RoomManager.getInstance().removeUser(this, this.spaceId);
-        }
-    }
-
     send(payload: OutgoingMessage) {
         if (this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(payload));
@@ -195,5 +212,111 @@ export class User {
     
     getY() {
         return this.y;
+    }
+
+    private startProximityCheck() {
+        // Check for nearby users every 2 seconds
+        this.proximityCheckInterval = setInterval(() => {
+            if (!this.spaceId) return;
+            
+            const proximityMap = RoomManager.getInstance().checkProximity(this.spaceId);
+            const nearbyUsers = proximityMap.get(this.id) || [];
+            
+            // Start connections with new nearby users
+            for (const nearbyUserId of nearbyUsers) {
+                if (!this.activeConnections.has(nearbyUserId)) {
+                    this.initiateConnection(nearbyUserId);
+                }
+            }
+            
+            // End connections with users who are no longer nearby
+            for (const connectedUserId of this.activeConnections) {
+                if (!nearbyUsers.includes(connectedUserId)) {
+                    this.endConnection(connectedUserId);
+                }
+            }
+        }, 2000);
+    }
+
+    private initiateConnection(targetUserId: string) {
+        if (!this.spaceId) return;
+        
+        const targetUser = RoomManager.getInstance().getUserById(this.spaceId, targetUserId);
+        if (!targetUser) return;
+        
+        console.log(`Initiating connection between ${this.userId} and ${targetUser.userId}`);
+        
+        // Send initiate-call message to both users
+        this.send({
+            type: "initiate-call",
+            payload: {
+                targetId: targetUser.id,
+                targetUserId: targetUser.userId
+            }
+        });
+        
+        targetUser.send({
+            type: "initiate-call",
+            payload: {
+                targetId: this.id,
+                targetUserId: this.userId
+            }
+        });
+        
+        this.activeConnections.add(targetUserId);
+    }
+    
+    private endConnection(targetUserId: string) {
+        if (!this.spaceId) return;
+        
+        const targetUser = RoomManager.getInstance().getUserById(this.spaceId, targetUserId);
+        if (!targetUser) {
+            // If user not found, just remove from active connections
+            this.activeConnections.delete(targetUserId);
+            return;
+        }
+        
+        console.log(`Ending connection between ${this.userId} and ${targetUser.userId}`);
+        
+        // Send end-call message to both users
+        this.send({
+            type: "end-call",
+            payload: {
+                targetId: targetUser.id,
+                targetUserId: targetUser.userId
+            }
+        });
+        
+        targetUser.send({
+            type: "end-call",
+            payload: {
+                targetId: this.id,
+                targetUserId: this.userId
+            }
+        });
+        
+        this.activeConnections.delete(targetUserId);
+    }
+
+    destroy() {
+
+        if (this.proximityCheckInterval) {
+            clearInterval(this.proximityCheckInterval);
+            this.proximityCheckInterval = null;
+        }
+
+        for (const connectedUserId of this.activeConnections) {
+            this.endConnection(connectedUserId);
+        }
+        if (this.spaceId) {
+            RoomManager.getInstance().broadcast({
+                type: "user-left",
+                payload: {
+                    userId: this.userId
+                }
+            }, this, this.spaceId);
+            
+            RoomManager.getInstance().removeUser(this, this.spaceId);
+        }
     }
 }

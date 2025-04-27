@@ -78,4 +78,38 @@ export class RoomManager {
     public getRoomCount(roomId: string): number {
         return this.rooms.get(roomId)?.length || 0;
     }
+
+    // Video call facilities from here : 
+
+    public checkProximity(spaceId: string, maxDistance: number = 2): Map<string, string[]> {
+        const users = this.rooms.get(spaceId) || [];
+        const proximityMap = new Map<string, string[]>();
+        
+        // Check each pair of users
+        for (let i = 0; i < users.length; i++) {
+          const userA = users[i];
+          const nearbyUsers: string[] = [];
+          
+          for (let j = 0; j < users.length; j++) {
+            if (i === j) continue; // Skip self
+            
+            const userB = users[j];
+            const distance = Math.sqrt(
+              Math.pow(userA.getX() - userB.getX(), 2) + 
+              Math.pow(userA.getY() - userB.getY(), 2)
+            );
+            
+            // If users are close enough, add to nearby list
+            if (distance <= maxDistance) {
+              nearbyUsers.push(userB.id);
+            }
+          }
+          
+          if (nearbyUsers.length > 0) {
+            proximityMap.set(userA.id, nearbyUsers);
+          }
+        }
+        
+        return proximityMap;
+      }
 }
